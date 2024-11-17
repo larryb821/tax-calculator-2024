@@ -8,8 +8,50 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Calculator, DollarSign } from 'lucide-react';
 
+// Type definitions
+interface IncomeInputs {
+  wages: string;
+  interest: string;
+  nonQualifiedDividends: string;
+  qualifiedDividends: string;
+  shortTermGains: string;
+  longTermGains: string;
+  otherIncome: string;
+}
+
+type FilingStatus = 'single' | 'joint' | 'head';
+
+interface TaxBracket {
+  rate: number;
+  upTo: number;
+}
+
+interface TaxBrackets {
+  single: TaxBracket[];
+  joint: TaxBracket[];
+  head: TaxBracket[];
+}
+
+interface StandardDeductions {
+  single: number;
+  joint: number;
+  head: number;
+}
+
+interface TaxResults {
+  ordinaryTax: number;
+  qualifiedTax: number;
+  totalTax: number;
+}
+
+interface QualifiedIncome {
+  qualifiedDividends: number;
+  longTermGains: number;
+}
+
 export default function TaxCalculator() {
-  const [incomeInputs, setIncomeInputs] = useState({
+  // State with type definitions
+  const [incomeInputs, setIncomeInputs] = useState<IncomeInputs>({
     wages: '',
     interest: '',
     nonQualifiedDividends: '',
@@ -18,12 +60,12 @@ export default function TaxCalculator() {
     longTermGains: '',
     otherIncome: ''
   });
-  const [filingStatus, setFilingStatus] = useState('single');
-  const [isItemized, setIsItemized] = useState(false);
-  const [itemizedAmount, setItemizedAmount] = useState('');
+  const [filingStatus, setFilingStatus] = useState<FilingStatus>('single');
+  const [isItemized, setIsItemized] = useState<boolean>(false);
+  const [itemizedAmount, setItemizedAmount] = useState<string>('');
 
   // 2024 Tax Brackets
-  const taxBrackets = {
+  const taxBrackets: TaxBrackets = {
     single: [
       { rate: 0.10, upTo: 11600 },
       { rate: 0.12, upTo: 47150 },
@@ -54,14 +96,14 @@ export default function TaxCalculator() {
   };
 
   // 2024 Standard Deductions
-  const standardDeductions = {
+  const standardDeductions: StandardDeductions = {
     single: 14600,
     joint: 29200,
     head: 21900
   };
 
   // Long-term capital gains tax brackets 2024
-  const longTermGainsBrackets = {
+  const longTermGainsBrackets: TaxBrackets = {
     single: [
       { rate: 0.00, upTo: 47025 },
       { rate: 0.15, upTo: 518900 },
@@ -79,14 +121,14 @@ export default function TaxCalculator() {
     ]
   };
 
-  const handleIncomeChange = (field, value) => {
+  const handleIncomeChange = (field: keyof IncomeInputs, value: string): void => {
     setIncomeInputs(prev => ({
       ...prev,
       [field]: value
     }));
   };
 
-  const calculateOrdinaryIncome = () => {
+  const calculateOrdinaryIncome = (): number => {
     const numbers = {
       wages: parseFloat(incomeInputs.wages) || 0,
       interest: parseFloat(incomeInputs.interest) || 0,
@@ -97,14 +139,14 @@ export default function TaxCalculator() {
     return Object.values(numbers).reduce((sum, num) => sum + num, 0);
   };
 
-  const calculateQualifiedIncome = () => {
+  const calculateQualifiedIncome = (): QualifiedIncome => {
     return {
       qualifiedDividends: parseFloat(incomeInputs.qualifiedDividends) || 0,
       longTermGains: parseFloat(incomeInputs.longTermGains) || 0
     };
   };
 
-  const calculateTax = () => {
+  const calculateTax = (): TaxResults => {
     const ordinaryIncome = calculateOrdinaryIncome();
     const { qualifiedDividends, longTermGains } = calculateQualifiedIncome();
     const qualifiedIncome = qualifiedDividends + longTermGains;
@@ -153,7 +195,7 @@ export default function TaxCalculator() {
     };
   };
 
-  const formatCurrency = (amount) => {
+  const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -184,7 +226,7 @@ export default function TaxCalculator() {
           {/* Filing Status Section */}
           <div className="bg-white rounded-lg p-6 shadow-sm border border-slate-100">
             <Label className="text-lg font-semibold text-blue-900 block mb-4">Filing Status</Label>
-            <Select value={filingStatus} onValueChange={setFilingStatus}>
+            <Select value={filingStatus} onValueChange={(value: FilingStatus) => setFilingStatus(value)}>
               <SelectTrigger className="w-full md:w-1/2">
                 <SelectValue placeholder="Select filing status" />
               </SelectTrigger>
