@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Calculator, DollarSign } from 'lucide-react';
 
-// Type definitions
+// Rest of the code remains the same
 interface IncomeInputs {
   wages: string;
   interest: string;
@@ -42,6 +42,8 @@ interface TaxResults {
   ordinaryTax: number;
   qualifiedTax: number;
   totalTax: number;
+  taxableOrdinaryIncome: number;
+  taxableQualifiedIncome: number;
 }
 
 interface QualifiedIncome {
@@ -150,12 +152,15 @@ export default function TaxCalculator() {
     const ordinaryIncome = calculateOrdinaryIncome();
     const { qualifiedDividends, longTermGains } = calculateQualifiedIncome();
     const qualifiedIncome = qualifiedDividends + longTermGains;
+    const totalIncome = ordinaryIncome + qualifiedIncome;
 
     // Determine deduction amount
     const deduction = isItemized ? (parseFloat(itemizedAmount) || 0) : standardDeductions[filingStatus];
 
-    // Calculate taxable ordinary income
-    const taxableOrdinaryIncome = Math.max(0, ordinaryIncome - deduction);
+    // Apply deductions proportionally
+    const deductionRatio = totalIncome > 0 ? deduction / totalIncome : 0;
+    const taxableOrdinaryIncome = Math.max(0, ordinaryIncome * (1 - deductionRatio));
+    const taxableQualifiedIncome = Math.max(0, qualifiedIncome * (1 - deductionRatio));
     
     // Calculate ordinary income tax
     let remainingIncome = taxableOrdinaryIncome;
@@ -173,17 +178,28 @@ export default function TaxCalculator() {
 
     // Calculate qualified income tax (long-term capital gains and qualified dividends)
     let totalQualifiedTax = 0;
-    if (qualifiedIncome > 0) {
-      const taxableQualifiedIncome = Math.max(0, qualifiedIncome);
-      remainingIncome = taxableQualifiedIncome;
+    if (taxableQualifiedIncome > 0) {
+      // Start from the bracket that corresponds to total ordinary taxable income
+      let totalTaxableIncome = taxableOrdinaryIncome;
+      let qualifiedRemaining = taxableQualifiedIncome;
       previousUpTo = 0;
 
       for (const bracket of longTermGainsBrackets[filingStatus]) {
-        const bracketAmount = Math.min(remainingIncome, bracket.upTo - previousUpTo);
-        if (bracketAmount <= 0) break;
+        // Skip brackets that are completely filled by ordinary income
+        if (bracket.upTo <= totalTaxableIncome) {
+          previousUpTo = bracket.upTo;
+          continue;
+        }
+
+        // Calculate how much qualified income fits in this bracket
+        const availableInBracket = bracket.upTo - Math.max(totalTaxableIncome, previousUpTo);
+        const bracketAmount = Math.min(qualifiedRemaining, availableInBracket);
         
+        if (bracketAmount <= 0) break;
+
         totalQualifiedTax += bracketAmount * bracket.rate;
-        remainingIncome -= bracketAmount;
+        qualifiedRemaining -= bracketAmount;
+        totalTaxableIncome += bracketAmount;
         previousUpTo = bracket.upTo;
       }
     }
@@ -191,7 +207,9 @@ export default function TaxCalculator() {
     return {
       ordinaryTax: totalOrdinaryTax,
       qualifiedTax: totalQualifiedTax,
-      totalTax: totalOrdinaryTax + totalQualifiedTax
+      totalTax: totalOrdinaryTax + totalQualifiedTax,
+      taxableOrdinaryIncome,
+      taxableQualifiedIncome
     };
   };
 
@@ -207,7 +225,8 @@ export default function TaxCalculator() {
     calculateQualifiedIncome().qualifiedDividends + 
     calculateQualifiedIncome().longTermGains;
   const taxResults = calculateTax();
-  const effectiveRate = totalIncome ? (taxResults.totalTax / totalIncome * 100) : 0;
+  const taxableIncome = taxResults.taxableOrdinaryIncome + taxResults.taxableQualifiedIncome;
+  const effectiveRate = taxableIncome > 0 ? (taxResults.totalTax / taxableIncome * 100) : 0;
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8">
@@ -259,7 +278,7 @@ export default function TaxCalculator() {
                         type="number"
                         className="pl-7"
                         value={incomeInputs.wages}
-                        onChange={(e) => handleIncomeChange('wages', e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleIncomeChange('wages', e.target.value)}
                         placeholder="0"
                       />
                     </div>
@@ -276,7 +295,7 @@ export default function TaxCalculator() {
                         type="number"
                         className="pl-7"
                         value={incomeInputs.interest}
-                        onChange={(e) => handleIncomeChange('interest', e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleIncomeChange('interest', e.target.value)}
                         placeholder="0"
                       />
                     </div>
@@ -293,7 +312,7 @@ export default function TaxCalculator() {
                         type="number"
                         className="pl-7"
                         value={incomeInputs.nonQualifiedDividends}
-                        onChange={(e) => handleIncomeChange('nonQualifiedDividends', e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleIncomeChange('nonQualifiedDividends', e.target.value)}
                         placeholder="0"
                       />
                     </div>
@@ -310,7 +329,7 @@ export default function TaxCalculator() {
                         type="number"
                         className="pl-7"
                         value={incomeInputs.shortTermGains}
-                        onChange={(e) => handleIncomeChange('shortTermGains', e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleIncomeChange('shortTermGains', e.target.value)}
                         placeholder="0"
                       />
                     </div>
@@ -336,7 +355,7 @@ export default function TaxCalculator() {
                         type="number"
                         className="pl-7"
                         value={incomeInputs.qualifiedDividends}
-                        onChange={(e) => handleIncomeChange('qualifiedDividends', e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleIncomeChange('qualifiedDividends', e.target.value)}
                         placeholder="0"
                       />
                     </div>
@@ -353,7 +372,7 @@ export default function TaxCalculator() {
                         type="number"
                         className="pl-7"
                         value={incomeInputs.longTermGains}
-                        onChange={(e) => handleIncomeChange('longTermGains', e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleIncomeChange('longTermGains', e.target.value)}
                         placeholder="0"
                       />
                     </div>
@@ -373,7 +392,7 @@ export default function TaxCalculator() {
                     type="number"
                     className="pl-7"
                     value={incomeInputs.otherIncome}
-                    onChange={(e) => handleIncomeChange('otherIncome', e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleIncomeChange('otherIncome', e.target.value)}
                     placeholder="0"
                   />
                 </div>
@@ -414,7 +433,7 @@ export default function TaxCalculator() {
                       type="number"
                       className="pl-7"
                       value={itemizedAmount}
-                      onChange={(e) => setItemizedAmount(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setItemizedAmount(e.target.value)}
                       placeholder="Enter itemized deduction amount"
                     />
                   </div>
@@ -430,6 +449,10 @@ export default function TaxCalculator() {
               <div className="flex justify-between items-center">
                 <span className="text-slate-600">Total Income:</span>
                 <span className="font-semibold text-blue-900">{formatCurrency(totalIncome)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-600">Taxable Income:</span>
+                <span className="font-semibold text-blue-900">{formatCurrency(taxableIncome)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-slate-600">Ordinary Income Tax:</span>
